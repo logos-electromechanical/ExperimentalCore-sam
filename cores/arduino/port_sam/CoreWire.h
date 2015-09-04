@@ -22,9 +22,10 @@
 #define TwoWire_h
 
 // Include Atmel CMSIS driver
-#include <include/twi.h>
+//#include <component/twi.h>
+#include "sam.h"
 
-#include "Stream.h"
+#include "CoreStream.h"
 #include "variant.h"
 
 #define BUFFER_LENGTH 32

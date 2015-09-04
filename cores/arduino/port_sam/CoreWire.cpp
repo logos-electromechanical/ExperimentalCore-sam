@@ -22,7 +22,8 @@ extern "C" {
 #include <string.h>
 }
 
-#include "Wire.h"
+#if 0	// WiP
+#include "CoreWire.h"
 
 static inline bool TWI_FailedAcknowledge(Twi *pTwi) {
 	return pTwi->TWI_SR & TWI_SR_NACK;
@@ -407,4 +408,5 @@ TwoWire Wire1 = TwoWire(WIRE1_INTERFACE, Wire1_Init);
 void WIRE1_ISR_HANDLER(void) {
 	Wire1.onService();
 }
+#endif
 #endif
