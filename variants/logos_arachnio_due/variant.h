@@ -173,7 +173,11 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 #ifdef __cplusplus
 
 extern SAMSerial Serial;
+<<<<<<< HEAD
 //extern SAMSerial Serial1;
+=======
+extern SAMSerial Serial1;
+>>>>>>> [arachnio] Modified arachnio variant.h file to use new hardware serial class
 
 #endif
 
