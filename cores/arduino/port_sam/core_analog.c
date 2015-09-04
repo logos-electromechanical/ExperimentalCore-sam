@@ -202,6 +202,7 @@ void analogOutputInit(void) {
 // hardware support.  These are defined in the appropriate
 // pins_*.c file.  For the rest of the pins, we default
 // to digital output.
+#if 0 // WiP
 void analogWrite(uint32_t ulPin, uint32_t ulValue) {
 	uint32_t attr = g_aPinMap[ulPin].ulPinAttribute;
 
@@ -350,6 +351,7 @@ void analogWrite(uint32_t ulPin, uint32_t ulValue) {
 	else
 		digitalWrite(ulPin, HIGH);
 }
+#endif
 
 #ifdef __cplusplus
 }
