@@ -36,7 +36,7 @@
 #include "core_variant.h"
 
 #ifdef __cplusplus
-#include "CoreUsart.h"
+#include "CoreSerial.h"
 #endif // __cplusplus
 
 #ifdef __cplusplus
@@ -178,8 +178,8 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 
 #ifdef __cplusplus
 
-extern UARTClass Serial;
-extern UARTClass Serial1;
+extern SAMSerial Serial;
+extern SAMSerial Serial1;
 
 #endif
 
