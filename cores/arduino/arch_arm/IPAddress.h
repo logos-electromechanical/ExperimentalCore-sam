@@ -57,7 +57,7 @@ public:
     virtual size_t printTo(Print& p) const;
 
     friend class EthernetClass;
-    friend class UDP;
+    friend class UDPstream;
     friend class Client;
     friend class Server;
     friend class DhcpClass;
