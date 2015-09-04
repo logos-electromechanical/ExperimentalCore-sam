@@ -11,6 +11,7 @@
 
 #include "CoreSPI.hpp"
 
+#if 0
 SPIClass::SPIClass(Spi *_spi, uint32_t _id, void(*_initCb)(void)) :
   spi(_spi), id(_id), initCb(_initCb), initialized(false)
 {
@@ -288,4 +289,4 @@ static void SPI_0_Init(void) {
 
 SPIClass SPI(SPI_INTERFACE, SPI_INTERFACE_ID, SPI_0_Init);
 #endif // SPI_INTERFACES_COUNT
-
+#endif
