@@ -105,17 +105,8 @@ int SAMSerial::available(void)
 
 int SAMSerial::availableForWrite(void)
 {
-  int head = _tx_buffer._iHead;
-  int tail = _tx_buffer._iTail;
-
-  if (head >= tail)
-  {
-    return SERIAL_BUFFER_SIZE - 1 - head + tail;
-  }
-  else
-  {
-    return tail - head - 1;
-  }
+	if (_tx_buffer.isFull()) return 0;
+	return (SERIAL_BUFFER_SIZE - _tx_buffer.available());
 }
 
 int SAMSerial::peek( void )
@@ -126,18 +117,14 @@ int SAMSerial::peek( void )
 int SAMSerial::read( void )
 {
   // if the head isn't ahead of the tail, we don't have any characters
-  if ( _rx_buffer._iHead == _rx_buffer._iTail )
-    return -1;
-
-  uint8_t uc = _rx_buffer._aucBuffer[_rx_buffer._iTail];
-  _rx_buffer._iTail = (unsigned int)(_rx_buffer._iTail + 1) % SERIAL_BUFFER_SIZE;
-
-  return uc;
+  if (_rx_buffer.available()) {
+	  return _rx_buffer.read_char();
+  } else return -1;
 }
 
 void SAMSerial::flush( void )
 {
-  while (_tx_buffer._iHead != _tx_buffer._iTail); //wait for transmit data to be sent
+  while (_tx_buffer.available()); //wait for transmit data to be sent
   // Wait for transmission to complete
   while ((_pUsart->US_CSR & US_CSR_TXRDY) != US_CSR_TXRDY)
    ;
@@ -147,15 +134,13 @@ size_t SAMSerial::write( const uint8_t uc_data )
 {
   // Is the hardware currently busy?
   if (((_pUsart->US_CSR & US_CSR_TXRDY) != US_CSR_TXRDY) |
-      (_tx_buffer._iTail != _tx_buffer._iHead))
+      (_tx_buffer.available()))
   {
     // If busy we buffer
-    unsigned int l = (_tx_buffer._iHead + 1) % SERIAL_BUFFER_SIZE;
-    while (_tx_buffer._iTail == l)
+    while (_tx_buffer.isFull())
       ; // Spin locks if we're about to overwrite the buffer. This continues once the data is sent
 
-    _tx_buffer._aucBuffer[_tx_buffer._iHead] = uc_data;
-    _tx_buffer._iHead = l;
+    _tx_buffer.store_char(uc_data);
     // Make sure TX interrupt is enabled
     _pUsart->US_IER = US_IER_TXRDY;
   }
@@ -178,9 +163,8 @@ void SAMSerial::IrqHandler( void )
   // Do we need to keep sending data?
   if ((status & US_CSR_TXRDY) == US_CSR_TXRDY)
   {
-    if (_tx_buffer._iTail != _tx_buffer._iHead) {
-      _pUsart->US_THR = _tx_buffer._aucBuffer[_tx_buffer._iTail];
-      _tx_buffer._iTail = (unsigned int)(_tx_buffer._iTail + 1) % SERIAL_BUFFER_SIZE;
+    if (_tx_buffer.available()) {
+      _pUsart->US_THR = _tx_buffer.read_char();
     }
     else
     {
