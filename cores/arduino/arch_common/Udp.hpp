@@ -32,10 +32,10 @@
  * bjoern@cs.stanford.edu 12/30/2008
  */
 
-#ifndef udp_h
-#define udp_h
+#ifndef _ARDUINO_CORE_NETWORK_UDP_H_
+#define _ARDUINO_CORE_NETWORK_UDP_H_
 
-#include "CoreStream.h"
+#include "CoreStream.hpp"
 #include "IPAddress.h"
 
 #if 0 // take care of this later
@@ -87,4 +87,4 @@ protected:
 };
 #endif
 
-#endif
+#endif // _ARDUINO_CORE_NETWORK_UDP_H_

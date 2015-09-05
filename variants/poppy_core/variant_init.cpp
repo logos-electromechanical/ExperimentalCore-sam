@@ -16,8 +16,12 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "Arduino.h"
+
+#ifndef _ARDUINO_CORE_INIT_H_
+#define _ARDUINO_CORE_INIT_H_
 
 void initVariant( void )
 {
 }
+
+#endif // _ARDUINO_CORE_INIT_H_
