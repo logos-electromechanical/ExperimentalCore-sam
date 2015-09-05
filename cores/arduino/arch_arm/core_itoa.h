@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD:cores/arduino/arch_arm/core_itoa.h
   Copyright (c) 2015 Arduino LLC.  All right reserved.
+=======
+  Copyright (c) 2014 Arduino LLC.  All right reserved.
+>>>>>>> [all] headers update to hpp for C++ ones:cores/arduino/arch_arm/core_shift.h
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -15,6 +19,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+
 #ifndef _ARDUINO_CORE_ITOA_H_
 #define _ARDUINO_CORE_ITOA_H_
 

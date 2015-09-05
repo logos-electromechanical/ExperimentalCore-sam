@@ -16,8 +16,8 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "Arduino.h"
-#include "core_private.h"
+#ifndef _ARDUINO_CORE_INIT_H_
+#define _ARDUINO_CORE_INIT_H_
 
 void initVariant( void )
 {
@@ -29,3 +29,5 @@ void initVariant( void )
   // TODO: move this to Serial class!
   FLEXCOM6->FLEXCOM_MR=FLEXCOM_MR_OPMODE_USART;
 }
+
+#endif // _ARDUINO_CORE_INIT_H_
