@@ -77,7 +77,7 @@
         <File Name="../../cores/arduino/port_sam/core_interrupts.c"/>
         <File Name="../../cores/arduino/port_sam/core_interrupts.h"/>
         <File Name="../../cores/arduino/port_sam/core_pulse.cpp"/>
-       <File Name="../../cores/arduino/port_sam/core_reset.cpp"/>
+        <File Name="../../cores/arduino/port_sam/core_reset.cpp"/>
         <File Name="../../cores/arduino/port_sam/core_private.c"/>
         <File Name="../../cores/arduino/port_sam/CoreSerial.cpp"/>
         <File Name="../../cores/arduino/port_sam/core_private.h"/>

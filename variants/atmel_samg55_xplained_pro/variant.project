@@ -79,7 +79,7 @@
         <File Name="../../cores/arduino/arch_common/Server.hpp"/>
         <File Name="../../cores/arduino/arch_common/core_new.hpp"/>
         <File Name="../../cores/arduino/arch_common/Udp.hpp"/>
-     </VirtualDirectory>
+      </VirtualDirectory>
       <VirtualDirectory Name="avr_compat">
         <File Name="../../cores/arduino/avr_compat/core_dtostrf.c"/>
         <File Name="../../cores/arduino/avr_compat/core_dtostrf.h"/>
