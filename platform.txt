@@ -85,7 +85,7 @@ recipe.size.regex=\.text\s+([0-9]+).*
 # SAM Uploader tools
 # -------------------
 
-tools.bossac.path={build.core.path}/../../tools/bossa
+tools.bossac.path="{build.core.path}/../../tools/bossa"
 tools.bossac.cmd=bossac
 tools.bossac.cmd.windows=bossac.exe
 
