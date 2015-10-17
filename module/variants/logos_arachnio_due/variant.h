@@ -113,6 +113,15 @@ static const uint8_t A7  = PIN_A7 ;
 #define ADC_RESOLUTION		12
 
 /*
+ * PWM defines
+ */
+ 
+#define PWM_RESOLUTION		16
+#define TC_RESOLUTION		16
+#define PWM_INTERFACE		ID_PWM
+#define PWM_MAX_DUTY_CYCLE	65535
+
+/*
  * ESP pins
  */
 #define CHIP_EN	             (24ul)

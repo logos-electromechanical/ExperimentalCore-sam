@@ -264,7 +264,6 @@ static void analogWriteDAC(uint32_t ulPin, uint32_t ulValue)
 
 static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 {
-#if 0
   ulValue = mapResolution(ulValue, _writeResolution, PWM_RESOLUTION);
 
   if (!PWMEnabled)
@@ -291,7 +290,7 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
   }
 
   PWMC_SetDutyCycle(PWM_INTERFACE, chan, ulValue);
-#endif // 0
+
 }
 
 static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
