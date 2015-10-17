@@ -119,7 +119,10 @@ static const uint8_t A7  = PIN_A7 ;
 #define PWM_RESOLUTION		16
 #define TC_RESOLUTION		16
 #define PWM_INTERFACE		ID_PWM
+#define TC_INTERFACE_ID     ID_TC0
+#define TC_FREQUENCY		1000
 #define PWM_MAX_DUTY_CYCLE	65535
+#define TC_MAX_DUTY_CYCLE	65535
 
 /*
  * ESP pins

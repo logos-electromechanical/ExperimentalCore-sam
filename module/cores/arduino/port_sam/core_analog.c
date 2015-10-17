@@ -191,12 +191,12 @@ uint32_t analogRead(uint32_t ulPin)
 
 static void TC_SetCMR_ChannelA(Tc *tc, uint32_t chan, uint32_t v)
 {
-//	tc->TC_CHANNEL[chan].TC_CMR = (tc->TC_CHANNEL[chan].TC_CMR & 0xFFF0FFFF) | v;
+	tc->TC_CHANNEL[chan].TC_CMR = (tc->TC_CHANNEL[chan].TC_CMR & 0xFFF0FFFF) | v;
 }
 
 static void TC_SetCMR_ChannelB(Tc *tc, uint32_t chan, uint32_t v)
 {
-//	tc->TC_CHANNEL[chan].TC_CMR = (tc->TC_CHANNEL[chan].TC_CMR & 0xF0FFFFFF) | v;
+	tc->TC_CHANNEL[chan].TC_CMR = (tc->TC_CHANNEL[chan].TC_CMR & 0xF0FFFFFF) | v;
 }
 
 void analogOutputInit(void)
@@ -295,9 +295,26 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 
 static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 {
-#if 0
   // We use MCLK/2 as clock.
   const uint32_t TC = VARIANT_MCK / 2 / TC_FREQUENCY;
+  
+  // channel mappings
+  static const uint32_t channelToChNo[] = { 
+	0, 0, 1, 1, 2, 2, 
+	0, 0, 1, 1, 2, 2, 
+	0, 0, 1, 1, 2, 2 };
+  static const uint32_t channelToAB[]   = { 
+	1, 0, 1, 0, 1, 0, 
+	1, 0, 1, 0, 1, 0, 
+	1, 0, 1, 0, 1, 0 };
+  static Tc *channelToTC[] = {
+    TC0, TC0, TC0, TC0, TC0, TC0,
+    TC1, TC1, TC1, TC1, TC1, TC1,
+    TC2, TC2, TC2, TC2, TC2, TC2 };
+  static const uint32_t channelToId[] = { 
+	0, 0, 1, 1, 2, 2, 
+	3, 3, 4, 4, 5, 5, 
+	6, 6, 7, 7, 8, 8 };
 
   // Map value to Timer ranges 0..255 => 0..TC
   ulValue = mapResolution(ulValue, _writeResolution, TC_RESOLUTION);
@@ -305,14 +322,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   ulValue = ulValue / TC_MAX_DUTY_CYCLE;
 
   // Setup Timer for this pin
-  ETCChannel channel = g_aPinMap[ulPin].ulTCChannel;
-  static const uint32_t channelToChNo[] = { 0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2 };
-  static const uint32_t channelToAB[]   = { 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0 };
-  static Tc *channelToTC[] = {
-    TC0, TC0, TC0, TC0, TC0, TC0,
-    TC1, TC1, TC1, TC1, TC1, TC1,
-    TC2, TC2, TC2, TC2, TC2, TC2 };
-  static const uint32_t channelToId[] = { 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8 };
+  ETCChannel channel = g_aPinMap[ulPin].ulTimerChannel;
   uint32_t chNo = channelToChNo[channel];
   uint32_t chA  = channelToAB[channel];
   Tc *chTC = channelToTC[channel];
@@ -366,7 +376,6 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
     TC_Start(chTC, chNo);
     TCChanEnabled[interfaceID] = 1;
   }
-#endif // 0
 }
 
 // Right now, PWM output only works on the pins with
