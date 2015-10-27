@@ -105,7 +105,8 @@ COMMON_FLAGS += -Wpacked -Wredundant-decls -Wlong-long
 COMMON_FLAGS += -Wunreachable-code -Wcast-align
 # -Wmissing-noreturn -Wconversion
 COMMON_FLAGS += --param max-inline-insns-single=500 -mcpu=$(DEVICE_CORE) -mthumb -ffunction-sections -fdata-sections
-COMMON_FLAGS += -D$(DEVICE_PART) -DDONT_USE_CMSIS_INIT -fdiagnostics-color=always
+# COMMON_FLAGS += -D$(DEVICE_PART) -DDONT_USE_CMSIS_INIT -fdiagnostics-color=always
+COMMON_FLAGS += -D$(DEVICE_PART) -DDONT_USE_CMSIS_INIT 
 COMMON_FLAGS += -Wa,-adhlns="$(subst .o,.lst,$@)"
 COMMON_FLAGS += $(INC_PATH) -DF_CPU=$(DEVICE_FREQUENCY)
 COMMON_FLAGS += --param max-inline-insns-single=500
