@@ -8,3 +8,4 @@ obj
 *.lst
 *.a
 lib*_symbols.lst
+lib*_symbols.txt
