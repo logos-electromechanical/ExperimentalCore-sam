@@ -6,4 +6,5 @@ obj
 *.o
 *.d
 *.lst
+*.a
 lib*_symbols.lst
