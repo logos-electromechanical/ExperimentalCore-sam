@@ -17,6 +17,7 @@
  */
 
 #include "Arduino.h"
+#include <assert.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,8 @@ eAnalogReference analog_reference = AR_DEFAULT;
 static uint8_t PWMEnabled = 0;
 static uint8_t pinEnabled[PINS_COUNT];
 static uint8_t TCChanEnabled[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static uint16_t FindClockConfiguration(uint32_t frequency, uint32_t mck);
 
 void analogReadResolution(int res)
 {
@@ -259,27 +262,107 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
   if (!PWMEnabled)
   {
     // PWM Startup code
-    pmc_enable_periph_clk(PWM_INTERFACE_ID);
-    PWMC_ConfigureClocks(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, 0, VARIANT_MCK);
-    PWMEnabled = 1;
+    PMC->PMC_PCER0 = 1 << PWM_INTERFACE_ID;		// start the PWM peripheral clock
+	uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
+    assert( result != 0 );
+	PWM->PWM_CLK = result;
+	PWMEnabled = 1;
   }
 
   uint32_t chan = g_aPinMap[ulPin].ulPWMChannel;
   if (!pinEnabled[ulPin])
   {
+	Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+	uint32_t dwSR0 = port->PIO_ABCDSR[0];
+	uint32_t dwSR1 = port->PIO_ABCDSR[1];
     // Setup PWM for this pin
-    PIO_Configure(g_aPinMap[ulPin].pPort,
-        g_aPinMap[ulPin].ulPinType,
-        g_aPinMap[ulPin].ulPin,
-        g_aPinMap[ulPin].ulPinConfiguration);
-    PWMC_ConfigureChannel(PWM_INTERFACE, chan, PWM_CMR_CPRE_CLKA, 0, 0);
-    PWMC_SetPeriod(PWM_INTERFACE, chan, PWM_MAX_DUTY_CYCLE);
-    PWMC_SetDutyCycle(PWM_INTERFACE, chan, ulValue);
-    PWMC_EnableChannel(PWM_INTERFACE, chan);
+	switch (g_aPinMap[ulPin].ulPWMChannel) {
+		// This nested switch is an ugly hack, but I can't think of a better way that doesn't involved major surgery
+#if (defined _SAM4S_)
+		case (PWM_CHL0):
+			switch (g_aPinMap[ulPin].ulPin) {
+				case (PIO_PA11):
+				#if (defined PIO_PA23)
+				case (PIO_PA23):	// Peripheral B
+				#endif
+					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				case (PIO_PB0|PIO_PA0):		// Peripheral A
+					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				default:
+					return;
+			}
+			break;
+		case (PWM_CHL1):
+			switch (g_aPinMap[ulPin].ulPin) {
+				case (PIO_PA12):
+				#if (defined PIO_PA24)
+				case (PIO_PA24):	// Peripheral B
+				#endif
+					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				case (PIO_PB1|PIO_PA1):		// Peripheral A
+					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				default:
+					return;
+			}
+			break;
+		case (PWM_CHL2):
+			switch (g_aPinMap[ulPin].ulPin) {
+				case (PIO_PA13):
+				#if (defined PIO_PA25)
+				case (PIO_PA25):
+				#endif
+				case (PIO_PB4):		// Peripheral B
+					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				case (PIO_PA2):		// Peripheral A
+					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				default:
+					return;
+			}
+			break;
+		case (PWM_CHL3):
+			switch (g_aPinMap[ulPin].ulPin) {
+				case (PIO_PA7):
+				case (PIO_PA14):
+				#if (defined PIO_PB14)
+				case (PIO_PB14):	// Peripheral B
+				#endif
+					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+					break;
+				case (PIO_PA17):	// Peripheral C
+					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+					port->PIO_ABCDSR[1] &= (g_aPinMap[ulPin].ulPin | dwSR1);
+					break;
+				default:
+					return;
+			}
+			break;
+#endif
+		default:
+			return;
+	}
+	port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
+	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel
+    PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD = PWM_MAX_DUTY_CYCLE;		// set the PWM period
+    assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
+	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycl
+    PWM_INTERFACE->PWM_ENA = 1 << chan;									// enable the channel
     pinEnabled[ulPin] = 1;
   }
-
-  PWMC_SetDutyCycle(PWM_INTERFACE, chan, ulValue);
+  assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
+  PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
 
 }
 
@@ -290,21 +373,41 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   
   // channel mappings
   static const uint32_t channelToChNo[] = { 
-	0, 0, 1, 1, 2, 2, 
-	0, 0, 1, 1, 2, 2, 
-	0, 0, 1, 1, 2, 2 };
+	0, 0, 1, 1, 2, 2 
+	#if (defined TC1)
+	, 0, 0, 1, 1, 2, 2
+	#endif 
+	#if (defined TC2)
+	, 0, 0, 1, 1, 2, 2
+	#endif
+	};
   static const uint32_t channelToAB[]   = { 
-	1, 0, 1, 0, 1, 0, 
-	1, 0, 1, 0, 1, 0, 
-	1, 0, 1, 0, 1, 0 };
+	1, 0, 1, 0, 1, 0 
+	#if (defined TC1)
+	, 1, 0, 1, 0, 1, 0 
+	#endif 
+	#if (defined TC2)
+	, 1, 0, 1, 0, 1, 0 
+	#endif
+	};
   static Tc *channelToTC[] = {
-    TC0, TC0, TC0, TC0, TC0, TC0,
-    TC1, TC1, TC1, TC1, TC1, TC1,
-    TC2, TC2, TC2, TC2, TC2, TC2 };
+    TC0, TC0, TC0, TC0, TC0, TC0
+	#if (defined TC1)
+    , TC1, TC1, TC1, TC1, TC1, TC1
+	#endif 
+	#if (defined TC2)
+    , TC2, TC2, TC2, TC2, TC2, TC2 
+	#endif
+	};
   static const uint32_t channelToId[] = { 
-	0, 0, 1, 1, 2, 2, 
-	3, 3, 4, 4, 5, 5, 
-	6, 6, 7, 7, 8, 8 };
+	0, 0, 1, 1, 2, 2
+	#if (defined TC1) 
+	, 3, 3, 4, 4, 5, 5 
+	#endif 
+	#if (defined TC2)
+	, 6, 6, 7, 7, 8, 8 
+	#endif
+	};
 
   // Map value to Timer ranges 0..255 => 0..TC
   ulValue = mapResolution(ulValue, _writeResolution, TC_RESOLUTION);
@@ -312,23 +415,28 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   ulValue = ulValue / TC_MAX_DUTY_CYCLE;
 
   // Setup Timer for this pin
-  ETCChannel channel = g_aPinMap[ulPin].ulTimerChannel;
+  ETimerChannel channel = g_aPinMap[ulPin].ulTimerChannel;
   uint32_t chNo = channelToChNo[channel];
   uint32_t chA  = channelToAB[channel];
   Tc *chTC = channelToTC[channel];
   uint32_t interfaceID = channelToId[channel];
-
+  assert( chNo < (sizeof( chTC->TC_CHANNEL )/sizeof( chTC->TC_CHANNEL[0] )) ) ;
+  TcChannel* pTcCh = chTC->TC_CHANNEL+chNo;
+  
   if (!TCChanEnabled[interfaceID])
   {
-    pmc_enable_periph_clk(TC_INTERFACE_ID + interfaceID);
-    TC_Configure(chTC, chNo,
-      TC_CMR_TCCLKS_TIMER_CLOCK1 |
+	PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
+	pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
+	pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
+	pTcCh->TC_SR ;											// clear status register
+	pTcCh->TC_CMR =											// set mode
+      (TC_CMR_TCCLKS_TIMER_CLOCK1 |
       TC_CMR_WAVE |         // Waveform mode
       TC_CMR_WAVSEL_UP_RC | // Counter running up and reset when equals to RC
       TC_CMR_EEVT_XC0 |     // Set external events from XC0 (this setup TIOB as output)
       TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR |
       TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR);
-    TC_SetRC(chTC, chNo, TC);
+	chTC->TC_CHANNEL[chNo].TC_RC = TC;
   }
 
   if (ulValue == 0)
@@ -342,28 +450,30 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   {
     if (chA)
     {
-      TC_SetRA(chTC, chNo, ulValue);
+	  chTC->TC_CHANNEL[chNo].TC_RA = ulValue;
       chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_SET;
     }
     else
     {
-      TC_SetRB(chTC, chNo, ulValue);
+      chTC->TC_CHANNEL[chNo].TC_RB = ulValue;
       chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xF0FFFFFF) | TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_SET;
     }
   }
 
   if (!pinEnabled[ulPin])
   {
-    PIO_Configure(g_aPinMap[ulPin].pPort,
-        g_aPinMap[ulPin].ulPinType,
-        g_aPinMap[ulPin].ulPin,
-        g_aPinMap[ulPin].ulPinConfiguration);
+    Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+	uint32_t dwSR0 = port->PIO_ABCDSR[0];
+	uint32_t dwSR1 = port->PIO_ABCDSR[1];
+	port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+	port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+	port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
     pinEnabled[ulPin] = 1;
   }
 
   if (!TCChanEnabled[interfaceID])
   {
-    TC_Start(chTC, chNo);
+    pTcCh->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;						// start timer/counter
     TCChanEnabled[interfaceID] = 1;
   }
 }
@@ -405,6 +515,51 @@ void analogWrite(uint32_t ulPin, uint32_t ulValue)
       }
     }
   }
+}
+
+/*----------------------------------------------------------------------------
+ *         Local functions
+ *----------------------------------------------------------------------------*/
+
+/**
+ * \brief Finds a prescaler/divisor couple to generate the desired frequency
+ * from MCK.
+ *
+ * Returns the value to enter in PWM_CLK or 0 if the configuration cannot be
+ * met.
+ *
+ * \param frequency  Desired frequency in Hz.
+ * \param mck  Master clock frequency in Hz.
+ */
+static uint16_t FindClockConfiguration(
+    uint32_t frequency,
+    uint32_t mck)
+{
+    uint32_t divisors[11] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024};
+    uint8_t divisor = 0;
+    uint32_t prescaler;
+
+    assert(frequency < mck);
+
+    /* Find prescaler and divisor values */
+    prescaler = (mck / divisors[divisor]) / frequency;
+    while ((prescaler > 255) && (divisor < 11)) {
+
+        divisor++;
+        prescaler = (mck / divisors[divisor]) / frequency;
+    }
+
+    /* Return result */
+    if ( divisor < 11 )
+    {
+//        TRACE_DEBUG( "Found divisor=%u and prescaler=%u for freq=%uHz\n\r", divisors[divisor], prescaler, frequency ) ;
+
+        return prescaler | (divisor << 8) ;
+    }
+    else
+    {
+        return 0 ;
+    }
 }
 
 #ifdef __cplusplus

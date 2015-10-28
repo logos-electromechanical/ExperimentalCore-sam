@@ -23,6 +23,32 @@
 extern "C" {
 #endif
 
+// If we don't have all the things we need defined, define them here to prevent compilation errors
+#ifndef PWM_RESOLUTION
+#define PWM_RESOLUTION 		8
+#endif
+#ifndef TC_RESOLUTION
+#define TC_RESOLUTION		8
+#endif
+#ifndef PWM_INTERFACE_ID
+#define PWM_INTERFACE_ID 	ID_PWM
+#endif
+#ifndef TC_INTERFACE_ID
+#define TC_INTERFACE_ID     ID_TC0
+#endif
+#ifndef PWM_FREQUENCY
+#define PWM_FREQUENCY		1000
+#endif
+#ifndef TC_FREQUENCY
+#define TC_FREQUENCY		1000
+#endif
+#ifndef PWM_MAX_DUTY_CYCLE
+#define PWM_MAX_DUTY_CYCLE	255
+#endif
+#ifndef TC_MAX_DUTY_CYCLE
+#define TC_MAX_DUTY_CYCLE	255
+#endif 
+
 /*
  * \brief SAM3 products have only one reference for ADC
  */
