@@ -7,5 +7,9 @@ obj
 *.d
 *.lst
 *.a
+*.elf
+*.bin
 lib*_symbols.lst
 lib*_symbols.txt
+*_symbols.txt
+*.map
