@@ -64,13 +64,13 @@ uint32_t analogRead(uint32_t ulPin)
 {
   uint32_t ulValue = 0;
 
-  uint32_t ulChannel;
+  int32_t ulChannel;	// signed so that NOT_ON_ANALOG comparison works
 
 //  if (ulPin < A0)
 //    ulPin += A0;
 
   ulChannel = g_aPinMap[ulPin].ulADCChannelNumber ;
-  
+  if (ulChannel == NOT_ON_ANALOG) return 0;
 #if (defined ADC)
 	if (!ADCenabled) {
 		ADC->ADC_CR = ADC_CR_SWRST;								// Reset the controller
@@ -95,122 +95,6 @@ uint32_t analogRead(uint32_t ulPin)
 	ulValue = ADC->ADC_LCDR;
 	ulValue = mapResolution(ulValue, ADC_RESOLUTION, _readResolution);
 	ADC->ADC_CHDR = 1 << ulChannel;	// disable channel
-#endif
-
-#if defined __SAM3U4E__
-  switch ( g_aPinMap[ulPin].ulAnalogChannel )
-  {
-    // Handling ADC 10/12 bits channels
-    case ADC0 :
-    case ADC1 :
-    case ADC2 :
-    case ADC3 :
-    case ADC4 :
-    case ADC5 :
-    case ADC6 :
-    case ADC7 :
-      // Enable the corresponding channel
-      adc_enable_channel( ADC, ulChannel );
-
-      // Start the ADC
-      adc_start( ADC );
-
-      // Wait for end of conversion
-      while ((adc_get_status(ADC) & ADC_SR_DRDY) != ADC_SR_DRDY)
-        ;
-
-      // Read the value
-      ulValue = adc_get_latest_value(ADC);
-      ulValue = mapResolution(ulValue, 10, _readResolution);
-
-      // Disable the corresponding channel
-      adc_disable_channel( ADC, ulChannel );
-
-      // Stop the ADC
-      //      adc_stop( ADC ) ; // never do adc_stop() else we have to reconfigure the ADC each time
-      break;
-
-    // Handling ADC 12 bits channels
-    case ADC8 :
-    case ADC9 :
-    case ADC10 :
-    case ADC11 :
-    case ADC12 :
-    case ADC13 :
-    case ADC14 :
-    case ADC15 :
-      // Enable the corresponding channel
-      adc12b_enable_channel( ADC12B, ulChannel );
-
-      // Start the ADC12B
-      adc12b_start( ADC12B );
-
-      // Wait for end of conversion
-      while ((adc12b_get_status(ADC12B) & ADC12B_SR_DRDY) != ADC12B_SR_DRDY)
-        ;
-
-      // Read the value
-      ulValue = adc12b_get_latest_value(ADC12B) >> 2;
-      ulValue = mapResolution(ulValue, 12, _readResolution);
-
-      // Stop the ADC12B
-      //      adc12_stop( ADC12B ) ; // never do adc12_stop() else we have to reconfigure the ADC12B each time
-
-      // Disable the corresponding channel
-      adc12b_disable_channel( ADC12B, ulChannel );
-      break;
-
-    // Compiler could yell because we don't handle DAC pins
-    default :
-      ulValue=0;
-      break;
-  }
-#endif
-
-#if defined __SAM3X8E__ || defined __SAM3X8H__
-  static uint32_t latestSelectedChannel = -1;
-  switch ( g_aPinMap[ulPin].ulAnalogChannel )
-  {
-    // Handling ADC 12 bits channels
-    case ADC0 :
-    case ADC1 :
-    case ADC2 :
-    case ADC3 :
-    case ADC4 :
-    case ADC5 :
-    case ADC6 :
-    case ADC7 :
-    case ADC8 :
-    case ADC9 :
-    case ADC10 :
-    case ADC11 :
-
-      // Enable the corresponding channel
-      if (ulChannel != latestSelectedChannel) {
-        adc_enable_channel( ADC, ulChannel );
-        if ( latestSelectedChannel != (uint32_t)-1 )
-          adc_disable_channel( ADC, latestSelectedChannel );
-        latestSelectedChannel = ulChannel;
-      }
-
-      // Start the ADC
-      adc_start( ADC );
-
-      // Wait for end of conversion
-      while ((adc_get_status(ADC) & ADC_ISR_DRDY) != ADC_ISR_DRDY)
-        ;
-
-      // Read the value
-      ulValue = adc_get_latest_value(ADC);
-      ulValue = mapResolution(ulValue, ADC_RESOLUTION, _readResolution);
-
-      break;
-
-    // Compiler could yell because we don't handle DAC pins
-    default :
-      ulValue=0;
-      break;
-  }
 #endif
 
   return ulValue;
@@ -285,9 +169,12 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 
   if (!PWMEnabled)
   {
-#if (defined _SAM4S_)
+#if (defined PWM)
     // PWM Startup code
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
     PMC->PMC_PCER0 = 1 << PWM_INTERFACE_ID;		// start the PWM peripheral clock
+#elif (defined _SAM3U_) || (defined _SAM3XA_)
+#endif
 	uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
     assert( result != 0 );
 	PWM_INTERFACE->PWM_CLK = result;
@@ -298,86 +185,57 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
   uint32_t chan = g_aPinMap[ulPin].ulPWMChannel;
   if (!pinEnabled[ulPin])
   {
-#if (defined _SAM4S_)
+#if (defined PWM)
 	Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
 	uint32_t dwSR0 = port->PIO_ABCDSR[0];
 	uint32_t dwSR1 = port->PIO_ABCDSR[1];
+#endif
     // Setup PWM for this pin
-	switch (g_aPinMap[ulPin].ulPWMChannel) {
-		// This nested switch is an ugly hack, but I can't think of a better way that doesn't involved major surgery
-
-		case (PWM_CHL0):
-			switch (g_aPinMap[ulPin].ulPin) {
-				case (PIO_PA11):
-				#if (defined PIO_PA23)
-				case (PIO_PA23):	// Peripheral B
-				#endif
-					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				case (PIO_PB0|PIO_PA0):		// Peripheral A
-					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				default:
-					return;
-			}
+	switch (g_aPinMap[ulPin].ulPin) {
+		// Prettier this way... hope it holds for the non-SAM4S architectures
+		case (PIO_PB0|PIO_PA0):
+		case (PIO_PB1|PIO_PA1):
+		case (PIO_PA2):				// Peripheral A
+		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
 			break;
-		case (PWM_CHL1):
-			switch (g_aPinMap[ulPin].ulPin) {
-				case (PIO_PA12):
-				#if (defined PIO_PA24)
-				case (PIO_PA24):	// Peripheral B
-				#endif
-					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				case (PIO_PB1|PIO_PA1):		// Peripheral A
-					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				default:
-					return;
-			}
+		#elif (defined _SAM3U_) || (defined _SAM3XA_)
+			port->PIO_ABSR &= (~g_aPinMap[ulPin].ulPin & port->PIO_ABSR);
+		#endif
+		case (PIO_PB4):
+		case (PIO_PA7):
+		case (PIO_PA11):
+		case (PIO_PA12):
+		case (PIO_PA13):
+		#if (defined PIO_PB14)
+		case (PIO_PB14|PIO_PA14):
+		#else
+		case (PIO_PA14):
+		#endif
+		#if (defined PIO_PA23)
+		case (PIO_PA23):
+		#endif
+		#if (defined PIO_PA24)
+		case (PIO_PA24):	
+		#endif
+		#if (defined PIO_PA25)
+		case (PIO_PA25):			// Peripheral B
+		#endif
+		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+			port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
+			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
 			break;
-		case (PWM_CHL2):
-			switch (g_aPinMap[ulPin].ulPin) {
-				case (PIO_PA13):
-				#if (defined PIO_PA25)
-				case (PIO_PA25):
-				#endif
-				case (PIO_PB4):		// Peripheral B
-					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				case (PIO_PA2):		// Peripheral A
-					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				default:
-					return;
-			}
+		#elif (defined _SAM3U_) || (defined _SAM3XA_)
+			port->PIO_ABSR &= (g_aPinMap[ulPin].ulPin | port->PIO_ABSR);
+		#endif
+		case (PIO_PA17):			// Peripheral C
+		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
+			port->PIO_ABCDSR[1] &= (g_aPinMap[ulPin].ulPin | dwSR1);
 			break;
-		case (PWM_CHL3):
-			switch (g_aPinMap[ulPin].ulPin) {
-				case (PIO_PA7):
-				#if (defined PIO_PB14)
-				case (PIO_PB14|PIO_PA14):
-				#else
-				case (PIO_PA14):		// Peripheral B
-				#endif
-					port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-					port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-					break;
-				case (PIO_PA17):	// Peripheral C
-					port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-					port->PIO_ABCDSR[1] &= (g_aPinMap[ulPin].ulPin | dwSR1);
-					break;
-				default:
-					return;
-			}
-			break;
-
+		#endif
 		default:
 			return;
 	}
@@ -390,7 +248,7 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
     pinEnabled[ulPin] = 1;
 #endif
   }
-#if (defined PWM_INTERFACE)
+#if (defined PWM)
   assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
   PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
 #endif
@@ -455,7 +313,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   
   if (!TCChanEnabled[interfaceID])
   {
-#if (defined _SAM4S_)
+#if (defined TC)
 	PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
 	pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
 	pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
@@ -473,7 +331,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 
   if (ulValue == 0)
   {
-#if (defined _SAM4S_)
+#if (defined TC)
     if (chA)
       chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR;
     else
