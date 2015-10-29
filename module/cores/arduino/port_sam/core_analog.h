@@ -30,11 +30,21 @@ extern "C" {
 #ifndef TC_RESOLUTION
 #define TC_RESOLUTION		8
 #endif
+#if (defined PWM)
 #ifndef PWM_INTERFACE_ID
 #define PWM_INTERFACE_ID 	ID_PWM
 #endif
+#ifndef PWM_INTERFACE
+#define PWM_INTERFACE		PWM
+#endif
+#endif
+#if (defined TC0)
 #ifndef TC_INTERFACE_ID
 #define TC_INTERFACE_ID     ID_TC0
+#endif
+#ifndef TC_INTERFACE
+#define TC_INTERFACE     	TC0
+#endif
 #endif
 #ifndef PWM_FREQUENCY
 #define PWM_FREQUENCY		1000
