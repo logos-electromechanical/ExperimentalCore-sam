@@ -130,6 +130,13 @@ static const uint8_t A7  = PIN_A7 ;
 #define TC_MIN_DUTY_CYCLE	0
 
 /*
+ * ADC defines
+ */
+#define ADC_PRESCALER		0
+#define ADC_STARTUP			0
+#define ADC_TRACKING		0
+
+/*
  * ESP pins
  */
 #define CHIP_EN	             (24ul)

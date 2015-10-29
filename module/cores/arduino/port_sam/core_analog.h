@@ -58,6 +58,9 @@ extern "C" {
 #ifndef TC_MAX_DUTY_CYCLE
 #define TC_MAX_DUTY_CYCLE	255
 #endif 
+#ifndef ADC_RESOLUTION
+#define ADC_RESOLUTION		10
+#endif 
 
 /*
  * \brief SAM3 products have only one reference for ADC

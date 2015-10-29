@@ -27,9 +27,10 @@ static int _readResolution = 10;
 static int _writeResolution = 8;
 
 eAnalogReference analog_reference = AR_DEFAULT;
-static uint8_t PWMEnabled = 0;
-static uint8_t pinEnabled[PINS_COUNT];
-static uint8_t TCChanEnabled[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8_t 	PWMEnabled = 0;
+static uint8_t 	pinEnabled[PINS_COUNT];
+static uint8_t 	TCChanEnabled[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static bool 	ADCenabled = false;
 
 static uint16_t FindClockConfiguration(uint32_t frequency, uint32_t mck);
 
@@ -63,18 +64,43 @@ uint32_t analogRead(uint32_t ulPin)
 {
   uint32_t ulValue = 0;
 
-#if 0 // TODO: implement
   uint32_t ulChannel;
 
-  if (ulPin < A0)
-    ulPin += A0;
+//  if (ulPin < A0)
+//    ulPin += A0;
 
   ulChannel = g_aPinMap[ulPin].ulADCChannelNumber ;
+  
+#if (defined ADC)
+	if (!ADCenabled) {
+		ADC->ADC_CR = ADC_CR_SWRST;								// Reset the controller
+		ADC->ADC_MR = 0;										// Reset mode register
+		ADC->ADC_PTCR = (ADC_PTCR_RXTDIS | ADC_PTCR_TXTDIS);	// Reset PDC transfer
+		ADC->ADC_RCR = 0;
+		ADC->ADC_RNCR = 0;
+		#if (defined ADC_PRESCALER)
+		ADC->ADC_MR |= ADC_MR_PRESCAL(ADC_PRESCALER);
+		#endif
+		#if (defined ADC_STARTUP)
+		ADC->ADC_MR |= ((ADC_STARTUP << ADC_MR_STARTUP_Pos) & ADC_MR_STARTUP_Msk);
+		#endif
+		#if (defined ADC_TRACKING)
+		ADC->ADC_MR |= ADC_MR_TRACKTIM(ADC_TRACKING);
+		#endif
+		ADCenabled = true;
+	}
+	ADC->ADC_CHER = 1 << ulChannel;	// enable channel
+	ADC->ADC_CR = ADC_CR_START;		// start conversion
+	while ((ADC->ADC_ISR & ADC_ISR_DRDY) != ADC_ISR_DRDY);		// wait for conversion to complete
+	ulValue = ADC->ADC_LCDR;
+	ulValue = mapResolution(ulValue, ADC_RESOLUTION, _readResolution);
+	ADC->ADC_CHDR = 1 << ulChannel;	// disable channel
+#endif
 
 #if defined __SAM3U4E__
   switch ( g_aPinMap[ulPin].ulAnalogChannel )
   {
-    // Handling ADC 10 bits channels
+    // Handling ADC 10/12 bits channels
     case ADC0 :
     case ADC1 :
     case ADC2 :
@@ -186,8 +212,6 @@ uint32_t analogRead(uint32_t ulPin)
       break;
   }
 #endif
-
-#endif // 0
 
   return ulValue;
 }
