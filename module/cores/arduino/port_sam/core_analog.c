@@ -171,10 +171,19 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
   {
 #if (defined PWM)
     // PWM Startup code
-#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
-    PMC->PMC_PCER0 = 1 << PWM_INTERFACE_ID;		// start the PWM peripheral clock
-#elif (defined _SAM3U_) || (defined _SAM3XA_)
-#endif
+	uint32_t ulID = PWM_INTERFACE_ID;
+	if (ulID < 32) {
+		if ((PMC->PMC_PCSR0 & (1u << ulID)) != (1u << ulID)) {
+			PMC->PMC_PCER0 = 1 << ulID;
+		}
+	#if (defined _SAM3S_) || (defined _SAM3XA_) || (defined _SAM4S_)
+	} else {
+		ulID -= 32;
+		if ((PMC->PMC_PCSR1 & (1u << ulID)) != (1u << ulID)) {
+			PMC->PMC_PCER1 = 1 << ulID;
+		}
+	#endif
+	}
 	uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
     assert( result != 0 );
 	PWM_INTERFACE->PWM_CLK = result;
@@ -187,23 +196,25 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
   {
 #if (defined PWM)
 	Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
-#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+#if (defined _SAM4S_)
 	uint32_t dwSR0 = port->PIO_ABCDSR[0];
 	uint32_t dwSR1 = port->PIO_ABCDSR[1];
 #endif
     // Setup PWM for this pin
 	switch (g_aPinMap[ulPin].ulPin) {
 		// Prettier this way... hope it holds for the non-SAM4S architectures
+		#if (defined _SAM4S_)
 		case (PIO_PB0|PIO_PA0):
 		case (PIO_PB1|PIO_PA1):
 		case (PIO_PA2):				// Peripheral A
-		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
 			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
 			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-			break;
-		#elif (defined _SAM3U_) || (defined _SAM3XA_)
+		#elif (defined _SAM3XA_)
+		case (-1):					// Peripheral A, unused
 			port->PIO_ABSR &= (~g_aPinMap[ulPin].ulPin & port->PIO_ABSR);
 		#endif
+			break;
+		#if (defined _SAM4S_)
 		case (PIO_PB4):
 		case (PIO_PA7):
 		case (PIO_PA11):
@@ -222,20 +233,23 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 		#endif
 		#if (defined PIO_PA25)
 		case (PIO_PA25):			// Peripheral B
-		#endif
-		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+		#endif /* (defined PIO_PA25) */
 			port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-			break;
-		#elif (defined _SAM3U_) || (defined _SAM3XA_)
+			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);	
+		#elif (defined _SAM3XA_)
+		case (PIO_PC21):
+		case (PIO_PC22):
+		case (PIO_PC23):
+		case (PIO_PC24):
 			port->PIO_ABSR &= (g_aPinMap[ulPin].ulPin | port->PIO_ABSR);
 		#endif
+			break;
 		case (PIO_PA17):			// Peripheral C
-		#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+		#if (defined _SAM4S_)
 			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
 			port->PIO_ABCDSR[1] &= (g_aPinMap[ulPin].ulPin | dwSR1);
 			break;
-		#endif
+		#endif /* (defined _SAM4S_) */
 		default:
 			return;
 	}
