@@ -6,4 +6,10 @@ obj
 *.o
 *.d
 *.lst
+*.a
+*.bin
+*.elf
+*.map
+*_symbols.txt
 lib*_symbols.lst
+lib*_symbols.txt
