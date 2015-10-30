@@ -327,7 +327,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
   
   if (!TCChanEnabled[interfaceID])
   {
-#if (defined TC)
+#if (defined TC0) || (defined TC1) || (defined TC2)
 	PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
 	pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
 	pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
@@ -345,7 +345,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 
   if (ulValue == 0)
   {
-#if (defined TC)
+#if (defined TC0) || (defined TC1) || (defined TC2)
     if (chA)
       chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR;
     else
@@ -368,12 +368,15 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 
   if (!pinEnabled[ulPin])
   {
-#if (defined _SAM4S_)
+#if (defined TC0) || (defined TC1) || (defined TC2)
     Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+	#if (defined _SAM4S_)
 	uint32_t dwSR0 = port->PIO_ABCDSR[0];
 	uint32_t dwSR1 = port->PIO_ABCDSR[1];
 	port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
 	port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
+	#elif (defined _SAM3XA_)
+	#endif
 	port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
     pinEnabled[ulPin] = 1;
 #endif
@@ -381,7 +384,7 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 
   if (!TCChanEnabled[interfaceID])
   {
-#if (defined _SAM4S_)
+#if (defined TC0) || (defined TC1) || (defined TC2)
     pTcCh->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;						// start timer/counter
     TCChanEnabled[interfaceID] = 1;
 #endif
