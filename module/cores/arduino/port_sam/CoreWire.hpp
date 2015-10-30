@@ -22,9 +22,10 @@
 #define _ARDUINO_CORE_WIRE_HPP_
 
 #include "CoreStream.hpp"
+#include "CoreRingBuffer.hpp"
 #include "variant.h"
 
-#define BUFFER_LENGTH 32
+//#define BUFFER_LENGTH 32
 
 class TwoWire : public Stream
 {
@@ -62,19 +63,22 @@ class TwoWire : public Stream
 
   private:
     // RX Buffer
-    uint8_t rxBuffer[BUFFER_LENGTH];
-    uint8_t rxBufferIndex;
-    uint8_t rxBufferLength;
+	RingBuffer rxBuffer;
+    //uint8_t rxBuffer[BUFFER_LENGTH];
+    //uint8_t rxBufferIndex;
+    //uint8_t rxBufferLength;
 
     // TX Buffer
+	RingBuffer txBuffer;
     uint8_t txAddress;
-    uint8_t txBuffer[BUFFER_LENGTH];
-    uint8_t txBufferLength;
+    //uint8_t txBuffer[BUFFER_LENGTH];
+    //uint8_t txBufferLength;
 
     // Service buffer
-    uint8_t srvBuffer[BUFFER_LENGTH];
-    uint8_t srvBufferIndex;
-    uint8_t srvBufferLength;
+	RingBuffer srvBuffer;
+    //uint8_t srvBuffer[BUFFER_LENGTH];
+    //uint8_t srvBufferIndex;
+    //uint8_t srvBufferLength;
 
     // Callback user functions
     void (*onRequestCallback)(void);

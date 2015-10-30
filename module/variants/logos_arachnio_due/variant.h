@@ -152,15 +152,15 @@ static const uint8_t MISO = PIN_SPI_MISO ;
 static const uint8_t SCK  = PIN_SPI_SCK ;
 #endif // TODO SPI
 
-#if 0 // TODO Wire
-/*
- * Wire Interfaces
- */
+
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (2ul)
-#define PIN_WIRE_SCL         (3ul)
-#endif // TODO Wire
+#define PIN_WIRE_SDA		(2ul)
+#define PIN_WIRE_SCL		(3ul)
+#define WIRE_INTERFACE		TWI0
+#define WIRE_INTERFACE_ID	ID_TWI0
+#define WIRE_ISR_HANDLER	TWI0_Handler
+#define WIRE_ISR_ID			TWI0_IRQn
 
 #ifdef __cplusplus
 }
