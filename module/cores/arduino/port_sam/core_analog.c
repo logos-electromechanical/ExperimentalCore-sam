@@ -33,6 +33,7 @@ static uint8_t 	TCChanEnabled[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 static bool 	ADCenabled = false;
 
 static uint16_t FindClockConfiguration(uint32_t frequency, uint32_t mck);
+static void 	SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask );
 
 void analogReadResolution(int res)
 {
@@ -165,230 +166,158 @@ static void analogWriteDAC(uint32_t ulPin, uint32_t ulValue)
 
 static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 {
-  ulValue = mapResolution(ulValue, _writeResolution, PWM_RESOLUTION);
+	ulValue = mapResolution(ulValue, _writeResolution, PWM_RESOLUTION);
 
-  if (!PWMEnabled)
-  {
+	if (!PWMEnabled) {
 #if (defined PWM)
-    // PWM Startup code
-	uint32_t ulID = PWM_INTERFACE_ID;
-	if (ulID < 32) {
-		if ((PMC->PMC_PCSR0 & (1u << ulID)) != (1u << ulID)) {
-			PMC->PMC_PCER0 = 1 << ulID;
-		}
+		// PWM Startup code
+		uint32_t ulID = PWM_INTERFACE_ID;
+		if (ulID < 32) {
+			if ((PMC->PMC_PCSR0 & (1u << ulID)) != (1u << ulID)) {
+				PMC->PMC_PCER0 = 1 << ulID;
+			}
 	#if (defined _SAM3S_) || (defined _SAM3XA_) || (defined _SAM4S_)
-	} else {
-		ulID -= 32;
-		if ((PMC->PMC_PCSR1 & (1u << ulID)) != (1u << ulID)) {
-			PMC->PMC_PCER1 = 1 << ulID;
+		} else {
+			ulID -= 32;
+			if ((PMC->PMC_PCSR1 & (1u << ulID)) != (1u << ulID)) {
+				PMC->PMC_PCER1 = 1 << ulID;
+			}
+	#endif /* (defined _SAM3S_) || (defined _SAM3XA_) || (defined _SAM4S_) */
 		}
-	#endif
+		uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
+		assert( result != 0 );
+		PWM_INTERFACE->PWM_CLK = result;
+		PWMEnabled = 1;
+#endif /* PWM */
 	}
-	uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
-    assert( result != 0 );
-	PWM_INTERFACE->PWM_CLK = result;
-	PWMEnabled = 1;
-#endif
-  }
 
-  uint32_t chan = g_aPinMap[ulPin].ulPWMChannel;
-  if (!pinEnabled[ulPin])
-  {
+	uint32_t chan = g_aPinMap[ulPin].ulPWMChannel;
+	if (!pinEnabled[ulPin])	{
 #if (defined PWM)
-	Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
-#if (defined _SAM4S_)
-	uint32_t dwSR0 = port->PIO_ABCDSR[0];
-	uint32_t dwSR1 = port->PIO_ABCDSR[1];
-#endif
-    // Setup PWM for this pin
-	switch (g_aPinMap[ulPin].ulPin) {
-		// Prettier this way... hope it holds for the non-SAM4S architectures
-		#if (defined _SAM4S_)
-		case (PIO_PB0|PIO_PA0):
-		case (PIO_PB1|PIO_PA1):
-		case (PIO_PA2):				// Peripheral A
-			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-		#elif (defined _SAM3XA_)
-		case (-1):					// Peripheral A, unused
-			port->PIO_ABSR &= (~g_aPinMap[ulPin].ulPin & port->PIO_ABSR);
-		#endif
-			break;
-		#if (defined _SAM4S_)
-		case (PIO_PB4):
-		case (PIO_PA7):
-		case (PIO_PA11):
-		case (PIO_PA12):
-		case (PIO_PA13):
-		#if (defined PIO_PB14)
-		case (PIO_PB14|PIO_PA14):
-		#else
-		case (PIO_PA14):
-		#endif
-		#if (defined PIO_PA23)
-		case (PIO_PA23):
-		#endif
-		#if (defined PIO_PA24)
-		case (PIO_PA24):	
-		#endif
-		#if (defined PIO_PA25)
-		case (PIO_PA25):			// Peripheral B
-		#endif /* (defined PIO_PA25) */
-			port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-			port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);	
-		#elif (defined _SAM3XA_)
-		case (PIO_PC21):
-		case (PIO_PC22):
-		case (PIO_PC23):
-		case (PIO_PC24):
-			port->PIO_ABSR &= (g_aPinMap[ulPin].ulPin | port->PIO_ABSR);
-		#endif
-			break;
-		case (PIO_PA17):			// Peripheral C
-		#if (defined _SAM4S_)
-			port->PIO_ABCDSR[0] &= (~g_aPinMap[ulPin].ulPin & dwSR0);
-			port->PIO_ABCDSR[1] &= (g_aPinMap[ulPin].ulPin | dwSR1);
-			break;
-		#endif /* (defined _SAM4S_) */
-		default:
-			return;
+		Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+		SetPeripheral(port, g_aPinMap[ulPin].ulAnalogOutPinType, g_aPinMap[ulPin].ulPin);
+		port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD = PWM_MAX_DUTY_CYCLE;		// set the PWM period
+		assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycl
+		PWM_INTERFACE->PWM_ENA = 1 << chan;									// enable the channel
+		pinEnabled[ulPin] = 1;
+#endif /* PWM */
 	}
-	port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
-	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel
-    PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD = PWM_MAX_DUTY_CYCLE;		// set the PWM period
-    assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
-	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycl
-    PWM_INTERFACE->PWM_ENA = 1 << chan;									// enable the channel
-    pinEnabled[ulPin] = 1;
-#endif
-  }
 #if (defined PWM)
-  assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
-  PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
-#endif
+	assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
+	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
+#endif /* PWM */
 }
 
 static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 {
-  // We use MCLK/2 as clock.
-  const uint32_t TC = VARIANT_MCK / 2 / TC_FREQUENCY;
+	// We use MCLK/2 as clock.
+	const uint32_t TC = VARIANT_MCK / 2 / TC_FREQUENCY;
+	 
+	// channel mappings
+	static const uint32_t channelToChNo[] = { 
+		0, 0, 1, 1, 2, 2 
+		#if (defined TC1)
+		, 0, 0, 1, 1, 2, 2
+		#endif 
+		#if (defined TC2)
+		, 0, 0, 1, 1, 2, 2
+		#endif
+	};
+	static const uint32_t channelToAB[]   = { 
+		1, 0, 1, 0, 1, 0 
+		#if (defined TC1)
+		, 1, 0, 1, 0, 1, 0 
+		#endif 
+		#if (defined TC2)
+		, 1, 0, 1, 0, 1, 0 
+		#endif
+	};
+	static Tc *channelToTC[] = {
+		TC0, TC0, TC0, TC0, TC0, TC0
+		#if (defined TC1)
+		, TC1, TC1, TC1, TC1, TC1, TC1
+		#endif 
+		#if (defined TC2)
+		, TC2, TC2, TC2, TC2, TC2, TC2 
+		#endif
+	};
+	static const uint32_t channelToId[] = { 
+		0, 0, 1, 1, 2, 2
+		#if (defined TC1) 
+		, 3, 3, 4, 4, 5, 5 
+		#endif 
+		#if (defined TC2)
+		, 6, 6, 7, 7, 8, 8 
+		#endif
+	};
+
+	// Map value to Timer ranges 0..255 => 0..TC
+	ulValue = mapResolution(ulValue, _writeResolution, TC_RESOLUTION);
+	ulValue = ulValue * TC;
+	ulValue = ulValue / TC_MAX_DUTY_CYCLE;
+
+	// Setup Timer for this pin
+	ETimerChannel channel = g_aPinMap[ulPin].ulTimerChannel;
+	uint32_t chNo = channelToChNo[channel];
+	uint32_t chA  = channelToAB[channel];
+	Tc *chTC = channelToTC[channel];
+	uint32_t interfaceID = channelToId[channel];
+	assert( chNo < (sizeof( chTC->TC_CHANNEL )/sizeof( chTC->TC_CHANNEL[0] )) ) ;
+	TcChannel* pTcCh = chTC->TC_CHANNEL+chNo;
   
-  // channel mappings
-  static const uint32_t channelToChNo[] = { 
-	0, 0, 1, 1, 2, 2 
-	#if (defined TC1)
-	, 0, 0, 1, 1, 2, 2
-	#endif 
-	#if (defined TC2)
-	, 0, 0, 1, 1, 2, 2
-	#endif
-	};
-  static const uint32_t channelToAB[]   = { 
-	1, 0, 1, 0, 1, 0 
-	#if (defined TC1)
-	, 1, 0, 1, 0, 1, 0 
-	#endif 
-	#if (defined TC2)
-	, 1, 0, 1, 0, 1, 0 
-	#endif
-	};
-  static Tc *channelToTC[] = {
-    TC0, TC0, TC0, TC0, TC0, TC0
-	#if (defined TC1)
-    , TC1, TC1, TC1, TC1, TC1, TC1
-	#endif 
-	#if (defined TC2)
-    , TC2, TC2, TC2, TC2, TC2, TC2 
-	#endif
-	};
-  static const uint32_t channelToId[] = { 
-	0, 0, 1, 1, 2, 2
-	#if (defined TC1) 
-	, 3, 3, 4, 4, 5, 5 
-	#endif 
-	#if (defined TC2)
-	, 6, 6, 7, 7, 8, 8 
-	#endif
-	};
-
-  // Map value to Timer ranges 0..255 => 0..TC
-  ulValue = mapResolution(ulValue, _writeResolution, TC_RESOLUTION);
-  ulValue = ulValue * TC;
-  ulValue = ulValue / TC_MAX_DUTY_CYCLE;
-
-  // Setup Timer for this pin
-  ETimerChannel channel = g_aPinMap[ulPin].ulTimerChannel;
-  uint32_t chNo = channelToChNo[channel];
-  uint32_t chA  = channelToAB[channel];
-  Tc *chTC = channelToTC[channel];
-  uint32_t interfaceID = channelToId[channel];
-  assert( chNo < (sizeof( chTC->TC_CHANNEL )/sizeof( chTC->TC_CHANNEL[0] )) ) ;
-  TcChannel* pTcCh = chTC->TC_CHANNEL+chNo;
-  
-  if (!TCChanEnabled[interfaceID])
-  {
+	if (!TCChanEnabled[interfaceID]) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
-	PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
-	pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
-	pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
-	pTcCh->TC_SR ;											// clear status register
-	pTcCh->TC_CMR =											// set mode
-      (TC_CMR_TCCLKS_TIMER_CLOCK1 |
-      TC_CMR_WAVE |         // Waveform mode
-      TC_CMR_WAVSEL_UP_RC | // Counter running up and reset when equals to RC
-      TC_CMR_EEVT_XC0 |     // Set external events from XC0 (this setup TIOB as output)
-      TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR |
-      TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR);
-	chTC->TC_CHANNEL[chNo].TC_RC = TC;
+		PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
+		pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
+		pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
+		pTcCh->TC_SR ;											// clear status register
+		pTcCh->TC_CMR =											// set mode
+			(TC_CMR_TCCLKS_TIMER_CLOCK1 |
+			TC_CMR_WAVE |         // Waveform mode
+			TC_CMR_WAVSEL_UP_RC | // Counter running up and reset when equals to RC
+			TC_CMR_EEVT_XC0 |     // Set external events from XC0 (this setup TIOB as output)
+			TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR |
+			TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR);
+		chTC->TC_CHANNEL[chNo].TC_RC = TC;
 #endif
-  }
+	}
 
-  if (ulValue == 0)
-  {
+	if (ulValue == 0) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
-    if (chA)
-      chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR;
-    else
-      chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xF0FFFFFF) | TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR;
-  }
-  else
-  {
-    if (chA)
-    {
-	  chTC->TC_CHANNEL[chNo].TC_RA = ulValue;
-      chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_SET;
-    }
-    else
-    {
-      chTC->TC_CHANNEL[chNo].TC_RB = ulValue;
-      chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xF0FFFFFF) | TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_SET;
-    }
+		if (chA) {
+			chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR;
+		} else {
+			chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xF0FFFFFF) | TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR;
+		}
+	} else {
+		if (chA) {
+			chTC->TC_CHANNEL[chNo].TC_RA = ulValue;
+			chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xFFF0FFFF) | TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_SET;
+		} else {
+			chTC->TC_CHANNEL[chNo].TC_RB = ulValue;
+			chTC->TC_CHANNEL[chNo].TC_CMR = (chTC->TC_CHANNEL[chNo].TC_CMR & 0xF0FFFFFF) | TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_SET;
+		}
 #endif
-  }
+	}
 
-  if (!pinEnabled[ulPin])
-  {
+	if (!pinEnabled[ulPin]) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
-    Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
-	#if (defined _SAM4S_)
-	uint32_t dwSR0 = port->PIO_ABCDSR[0];
-	uint32_t dwSR1 = port->PIO_ABCDSR[1];
-	port->PIO_ABCDSR[0] &= (g_aPinMap[ulPin].ulPin | dwSR0);
-	port->PIO_ABCDSR[1] &= (~g_aPinMap[ulPin].ulPin & dwSR1);
-	#elif (defined _SAM3XA_)
-	#endif
-	port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
-    pinEnabled[ulPin] = 1;
+		Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+		SetPeripheral(port,	g_aPinMap[ulPin].ulAnalogOutPinType, g_aPinMap[ulPin].ulPin);
+		port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
+		pinEnabled[ulPin] = 1;
 #endif
-  }
+	}
 
-  if (!TCChanEnabled[interfaceID])
-  {
+	if (!TCChanEnabled[interfaceID]) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
-    pTcCh->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;						// start timer/counter
-    TCChanEnabled[interfaceID] = 1;
+		pTcCh->TC_CCR = TC_CCR_CLKEN | TC_CCR_SWTRG ;						// start timer/counter
+		TCChanEnabled[interfaceID] = 1;
 #endif
-  }
+	}
 }
 
 /* PWM output only works on the pins with hardware support.
@@ -473,6 +402,81 @@ static uint16_t FindClockConfiguration(
     {
         return 0 ;
     }
+}
+
+/**
+ * \brief Configures one pin of a PIO controller as being controlled by specific peripheral.
+ *
+ * \param pPio    Pointer to a PIO controller.
+ * \param dwType  PIO type.
+ * \param dwMask  Bitmask of one or more pin(s) to configure.
+ */
+static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
+{
+    uint32_t dwSR ;
+
+    /* Disable interrupts on the pin(s) */
+    pPio->PIO_IDR = dwMask ;
+
+    switch ( dwType )
+    {
+        case GPIO_PERIPH_A :
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1];
+            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+#if (defined _SAM3U_) || (defined _SAM3XA_)
+            dwSR = pPio->PIO_ABSR ;
+            pPio->PIO_ABSR &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3U_) || (defined _SAM3XA_) */
+        break ;
+
+        case GPIO_PERIPH_B :
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+#if (defined _SAM3U_) || (defined _SAM3XA_)
+            dwSR = pPio->PIO_ABSR ;
+            pPio->PIO_ABSR = (dwMask | dwSR) ;
+#endif /* (defined _SAM3U_) || (defined _SAM3XA_) */
+        break ;
+
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+        case GPIO_PERIPH_C :
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
+        break ;
+#if (defined GPIO_PERIPH_D)
+        case GPIO_PERIPH_D :
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
+        break ;
+#endif /* (defined GPIO_PERIPH_D) */
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+        // other types are invalid in this function
+		case(GPIO_NOMUX):
+        default:
+			return;
+    }
+
+    // Remove the pins from under the control of PIO
+    pPio->PIO_PDR = dwMask ;
 }
 
 #ifdef __cplusplus

@@ -173,6 +173,7 @@ typedef struct _PinDescription
   EAnalogChannel  ulADCChannelNumber ; /* ADC Channel number in the SAM device */
   EPWMChannel     ulPWMChannel ;
   ETimerChannel   ulTimerChannel ;
+  EGPIOType       ulAnalogOutPinType ;
 } PinDescription ;
 
 /* Pins table to be instantiated into variant.cpp */
