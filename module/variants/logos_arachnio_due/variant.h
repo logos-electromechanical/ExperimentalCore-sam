@@ -131,7 +131,6 @@ static const uint8_t A7  = PIN_A7 ;
 #define PIN_SERIAL1_TX       (4ul)
 #endif // TODO Serial1
 
-#if 0 // TODO SPI
 /*
  * SPI Interfaces
  */
@@ -144,13 +143,29 @@ static const uint8_t A7  = PIN_A7 ;
 #define PIN_SPI_MISO         (20ul)
 #define PIN_SPI_MOSI         (21ul)
 #define PIN_SPI_SCK          (22ul)
-#define PIN_SPI_SS0          (23ul)
+#define PIN_SPI_SS0          (12ul)
+#define PIN_SPI_SS1          (0ul)
+#define PIN_SPI_SS2          (1ul)
+#define PIN_SPI_SS3          (9ul)
+#define BOARD_SPI_SS0        (12ul)
+#define BOARD_SPI_SS1        (0ul)
+#define BOARD_SPI_SS2        (1ul)
+#define BOARD_SPI_SS3        PIN_SPI_SS3
+#define BOARD_SPI_DEFAULT_SS BOARD_SPI_SS3
+
+#define BOARD_PIN_TO_SPI_PIN(x) \
+	(x==BOARD_SPI_SS0 ? PIN_SPI_SS0 : \
+	(x==BOARD_SPI_SS1 ? PIN_SPI_SS1 : \
+	(x==BOARD_SPI_SS2 ? PIN_SPI_SS2 : PIN_SPI_SS3 )))
+#define BOARD_PIN_TO_SPI_CHANNEL(x) \
+	(x==BOARD_SPI_SS0 ? 0 : \
+	(x==BOARD_SPI_SS1 ? 1 : \
+	(x==BOARD_SPI_SS2 ? 2 : 3)))
 
 static const uint8_t SS	  = PIN_SPI_SS0 ;
 static const uint8_t MOSI = PIN_SPI_MOSI ;
 static const uint8_t MISO = PIN_SPI_MISO ;
 static const uint8_t SCK  = PIN_SPI_SCK ;
-#endif // TODO SPI
 
 #if 0 // TODO Wire
 /*

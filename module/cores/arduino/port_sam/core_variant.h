@@ -24,9 +24,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include "sam.h"
 #include "core_constants.h"
+#include <stdint.h>
 
 /* The 2 following symbols must be present into variant_startup.c */
 extern uint32_t SystemCoreClock;

@@ -11,6 +11,8 @@
 
 #include "CoreSPI.hpp"
 
+static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask );
+
 SPIClass::SPIClass(Spi *_spi, uint32_t _id, uint32_t _defaultSS, void(*_initCb)(void)) :
   spi(_spi), id(_id), defaultSS(_defaultSS), initCb(_initCb), initialized(false)
 {
@@ -19,7 +21,6 @@ SPIClass::SPIClass(Spi *_spi, uint32_t _id, uint32_t _defaultSS, void(*_initCb)(
 
 void SPIClass::begin()
 {
-#if 0
   init();
   // NPCS control is left to the user
 
@@ -27,44 +28,35 @@ void SPIClass::begin()
   setClockDivider(BOARD_SPI_DEFAULT_SS, 21);
   setDataMode(BOARD_SPI_DEFAULT_SS, SPI_MODE0);
   setBitOrder(BOARD_SPI_DEFAULT_SS, MSBFIRST);
-#endif // 0
 }
 
 void SPIClass::begin(uint8_t _pin)
 {
-#if 0
-  init();
+	init();
 
-  uint32_t spiPin = BOARD_PIN_TO_SPI_PIN(_pin);
-  PIO_Configure(
-    g_aPinMap[spiPin].pPort,
-    g_aPinMap[spiPin].ulPinType,
-    g_aPinMap[spiPin].ulPin,
-    g_aPinMap[spiPin].ulPinConfiguration);
-
-  // Default speed set to 4Mhz
-  setClockDivider(_pin, 21);
-  setDataMode(_pin, SPI_MODE0);
-  setBitOrder(_pin, MSBFIRST);
-#endif // 0
+	uint32_t spiPin = BOARD_PIN_TO_SPI_PIN(_pin);
+	Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+	SetPeripheral(port, g_aPinMap[spiPin].ulPinType, g_aPinMap[spiPin].ulPin);
+	port->PIO_IDR = g_aPinMap[ulPin].ulPin;
+	// Default speed set to 4Mhz
+	setClockDivider(_pin, 21);
+	setDataMode(_pin, SPI_MODE0);
+	setBitOrder(_pin, MSBFIRST);
 }
 
 void SPIClass::init()
 {
-#if 0
-  if (initialized)
-    return;
-  interruptMode = 0;
-  interruptSave = 0;
-  interruptMask[0] = 0;
-  interruptMask[1] = 0;
-  interruptMask[2] = 0;
-  interruptMask[3] = 0;
-  initCb();
-  SPI_Configure(spi, id, SPI_MR_MSTR | SPI_MR_PS | SPI_MR_MODFDIS);
-  SPI_Enable(spi);
-  initialized = true;
-#endif // 0
+	if (initialized) {turn;}
+	interruptMode = 0;
+	interruptSave = 0;
+	interruptMask[0] = 0;
+	interruptMask[1] = 0;
+	interruptMask[2] = 0;
+	interruptMask[3] = 0;
+	initCb();
+	SPI_Configure(spi, id, SPI_MR_MSTR | SPI_MR_PS | SPI_MR_MODFDIS);
+	SPI_Enable(spi);
+	initialized = true;
 }
 
 #if 0
@@ -328,6 +320,82 @@ static void SPI_0_Init(void)
 }
 
 SPIClass SPI(SPI_INTERFACE, SPI_INTERFACE_ID, BOARD_SPI_DEFAULT_SS, SPI_0_Init);
+
+/**
+ * \brief Configures one pin of a PIO controller as being controlled by specific peripheral.
+ *
+ * \param pPio    Pointer to a PIO controller.
+ * \param dwType  PIO type.
+ * \param dwMask  Bitmask of one or more pin(s) to configure.
+ */
+static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
+{
+    uint32_t dwSR ;
+
+    /* Disable interrupts on the pin(s) */
+    pPio->PIO_IDR = dwMask ;
+
+    switch ( dwType )
+    {
+        case GPIO_PERIPH_A :
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1];
+            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+#if (defined _SAM3U_) || (defined _SAM3XA_)
+            dwSR = pPio->PIO_ABSR ;
+            pPio->PIO_ABSR &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3U_) || (defined _SAM3XA_) */
+        break ;
+
+        case GPIO_PERIPH_B :
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+#if (defined _SAM3U_) || (defined _SAM3XA_)
+            dwSR = pPio->PIO_ABSR ;
+            pPio->PIO_ABSR = (dwMask | dwSR) ;
+#endif /* (defined _SAM3U_) || (defined _SAM3XA_) */
+        break ;
+
+#if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
+        case GPIO_PERIPH_C :
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
+        break ;
+#if (defined GPIO_PERIPH_D)
+        case GPIO_PERIPH_D :
+            dwSR = pPio->PIO_ABCDSR[0] ;
+            pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
+
+            dwSR = pPio->PIO_ABCDSR[1] ;
+            pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
+        break ;
+#endif /* (defined GPIO_PERIPH_D) */
+#endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
+
+        // other types are invalid in this function
+		case(GPIO_NOMUX):
+        default:
+			return;
+    }
+
+    // Remove the pins from under the control of PIO
+    pPio->PIO_PDR = dwMask ;
+}
+
 #endif // 0
 #endif // SPI_INTERFACES_COUNT
 
