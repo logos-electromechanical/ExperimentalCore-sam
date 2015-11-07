@@ -6,4 +6,8 @@ obj
 *.o
 *.d
 *.lst
-lib*_symbols.lst
+*_symbols.txt
+*.a
+module/tools/edbg.exe
+module/tools/edbg
+*.bat
