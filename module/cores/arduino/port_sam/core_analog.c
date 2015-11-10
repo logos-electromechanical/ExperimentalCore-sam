@@ -28,7 +28,7 @@ static int _writeResolution = 8;
 
 eAnalogReference analog_reference = AR_DEFAULT;
 static uint8_t 	PWMEnabled = 0;
-static uint8_t 	pinEnabled[PINS_COUNT];
+static uint8_t 	pinEnabled[PINS_COUNT] = {0};
 static uint8_t 	TCChanEnabled[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 static bool 	ADCenabled = false;
 
