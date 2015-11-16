@@ -172,6 +172,7 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 #if (defined PWM)
 		// PWM Startup code
 		uint32_t ulID = PWM_INTERFACE_ID;
+		PMC->PMC_WPMR = 0x504d4300;	/* Turn off write protection for PMC */
 		if (ulID < 32) {
 			if ((PMC->PMC_PCSR0 & (1u << ulID)) != (1u << ulID)) {
 				PMC->PMC_PCER0 = 1 << ulID;
@@ -185,7 +186,8 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 	#endif /* (defined _SAM3S_) || (defined _SAM3XA_) || (defined _SAM4S_) */
 		}
 		uint32_t result = FindClockConfiguration(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK);
-		assert( result != 0 );
+		// assert( result != 0 );
+		PWM_INTERFACE->PWM_WPCR = 0x50574dfc;	/* Turn off write protection to all PWM registers */
 		PWM_INTERFACE->PWM_CLK = result;
 		PWMEnabled = 1;
 #endif /* PWM */
@@ -196,19 +198,19 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 #if (defined PWM)
 		Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
 		SetPeripheral(port, g_aPinMap[ulPin].ulAnalogOutPinType, g_aPinMap[ulPin].ulPin);
-		port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
-		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel
+		port->PIO_IDR = 1 << g_aPinMap[ulPin].ulPin;						// disable interrupt
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = 0;
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel clock
 		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD = PWM_MAX_DUTY_CYCLE;		// set the PWM period
-		assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
-		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycl
+		// assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycle
 		PWM_INTERFACE->PWM_ENA = 1 << chan;									// enable the channel
 		pinEnabled[ulPin] = 1;
+	} else {
+		// assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
 #endif /* PWM */
 	}
-#if (defined PWM)
-	assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);
-	PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTYUPD = ulValue;
-#endif /* PWM */
 }
 
 static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
@@ -265,24 +267,28 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 	uint32_t chA  = channelToAB[channel];
 	Tc *chTC = channelToTC[channel];
 	uint32_t interfaceID = channelToId[channel];
-	assert( chNo < (sizeof( chTC->TC_CHANNEL )/sizeof( chTC->TC_CHANNEL[0] )) ) ;
+	// assert( chNo < (sizeof( chTC->TC_CHANNEL )/sizeof( chTC->TC_CHANNEL[0] )) ) ;
 	TcChannel* pTcCh = chTC->TC_CHANNEL+chNo;
   
 	if (!TCChanEnabled[interfaceID]) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
+		PMC->PMC_WPMR = 0x504d4300;								/* Turn off write protection for PMC */
 		PMC->PMC_PCER0 = 1 << (TC_INTERFACE_ID + interfaceID);	// configure the TC peripheral clock
+	#if (defined TC_WPMR)
+		pTcCh->TC_WPMR = 0x54494d00;							// Turn off write protection for TC
+	#endif /* (defined TC_WPMR) */
 		pTcCh->TC_CCR = TC_CCR_CLKDIS ;							// disable TC clock
 		pTcCh->TC_IDR = 0xFFFFFFFF ;							// disable interrupts
 		pTcCh->TC_SR ;											// clear status register
 		pTcCh->TC_CMR =											// set mode
-			(TC_CMR_TCCLKS_TIMER_CLOCK1 |
-			TC_CMR_WAVE |         // Waveform mode
-			TC_CMR_WAVSEL_UP_RC | // Counter running up and reset when equals to RC
-			TC_CMR_EEVT_XC0 |     // Set external events from XC0 (this setup TIOB as output)
+			(TC_CMR_TCCLKS_TIMER_CLOCK1 |						// Select Timer Clock 1 (Master Clock/2)
+			TC_CMR_WAVE |         								// Waveform mode
+			TC_CMR_WAVSEL_UP_RC | 								// Counter running up and reset when equals to RC
+			TC_CMR_EEVT_XC0 |     								// Set external events from XC0 (this setup TIOB as output)
 			TC_CMR_ACPA_CLEAR | TC_CMR_ACPC_CLEAR |
 			TC_CMR_BCPB_CLEAR | TC_CMR_BCPC_CLEAR);
 		chTC->TC_CHANNEL[chNo].TC_RC = TC;
-#endif
+#endif /* (defined TC0) || (defined TC1) || (defined TC2) */
 	}
 
 	if (ulValue == 0) {
@@ -306,8 +312,8 @@ static void analogWriteTimer(uint32_t ulPin, uint32_t ulValue)
 	if (!pinEnabled[ulPin]) {
 #if (defined TC0) || (defined TC1) || (defined TC2)
 		Pio* port = Ports[g_aPinMap[ulPin].iPort].pGPIO;
+		port->PIO_IDR = 1 << g_aPinMap[ulPin].ulPin;								// disable interrupts
 		SetPeripheral(port,	g_aPinMap[ulPin].ulAnalogOutPinType, g_aPinMap[ulPin].ulPin);
-		port->PIO_IDR = g_aPinMap[ulPin].ulPin;								// disable interrupts
 		pinEnabled[ulPin] = 1;
 #endif
 	}
@@ -381,7 +387,7 @@ static uint16_t FindClockConfiguration(
     uint8_t divisor = 0;
     uint32_t prescaler;
 
-    assert(frequency < mck);
+    // assert(frequency < mck);
 
     /* Find prescaler and divisor values */
     prescaler = (mck / divisors[divisor]) / frequency;
@@ -417,6 +423,8 @@ static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
 
     /* Disable interrupts on the pin(s) */
     pPio->PIO_IDR = dwMask ;
+	/* Disable write protection */
+	pPio->PIO_WPMR = 0x50494f00;
 
     switch ( dwType )
     {
