@@ -166,6 +166,7 @@ static void analogWriteDAC(uint32_t ulPin, uint32_t ulValue)
 
 static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 {
+	ulValue = _writeResolution - ulValue;			// The PWM output is inverted, so we fix that here
 	ulValue = mapResolution(ulValue, _writeResolution, PWM_RESOLUTION);
 
 	if (!PWMEnabled) {
@@ -431,10 +432,9 @@ static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
         case GPIO_PERIPH_A :
 #if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
             dwSR = pPio->PIO_ABCDSR[0] ;
-            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
-
+            pPio->PIO_ABCDSR[0] = (~dwMask & dwSR) ;
             dwSR = pPio->PIO_ABCDSR[1];
-            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+            pPio->PIO_ABCDSR[1] = (~dwMask & dwSR) ;
 #endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
 
 #if (defined _SAM3U_) || (defined _SAM3XA_)
@@ -447,9 +447,8 @@ static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
 #if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
             dwSR = pPio->PIO_ABCDSR[0] ;
             pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
-
             dwSR = pPio->PIO_ABCDSR[1] ;
-            pPio->PIO_ABCDSR[1] &= (~dwMask & dwSR) ;
+            pPio->PIO_ABCDSR[1] = (~dwMask & dwSR) ;
 #endif /* (defined _SAM3S_) || (defined _SAM3S8_) || (defined _SAM3N_) */
 
 #if (defined _SAM3U_) || (defined _SAM3XA_)
@@ -461,8 +460,7 @@ static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
 #if (defined _SAM3S_) || (defined _SAM4S_) || (defined _SAM3S8_) || (defined _SAM3N_)
         case GPIO_PERIPH_C :
             dwSR = pPio->PIO_ABCDSR[0] ;
-            pPio->PIO_ABCDSR[0] &= (~dwMask & dwSR) ;
-
+            pPio->PIO_ABCDSR[0] = (~dwMask & dwSR) ;
             dwSR = pPio->PIO_ABCDSR[1] ;
             pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
         break ;
@@ -470,7 +468,6 @@ static void SetPeripheral( Pio* pPio, EGPIOType dwType, uint32_t dwMask )
         case GPIO_PERIPH_D :
             dwSR = pPio->PIO_ABCDSR[0] ;
             pPio->PIO_ABCDSR[0] = (dwMask | dwSR) ;
-
             dwSR = pPio->PIO_ABCDSR[1] ;
             pPio->PIO_ABCDSR[1] = (dwMask | dwSR) ;
         break ;
