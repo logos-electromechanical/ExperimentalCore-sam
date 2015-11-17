@@ -166,7 +166,6 @@ static void analogWriteDAC(uint32_t ulPin, uint32_t ulValue)
 
 static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 {
-	ulValue = _writeResolution - ulValue;			// The PWM output is inverted, so we fix that here
 	ulValue = mapResolution(ulValue, _writeResolution, PWM_RESOLUTION);
 
 	if (!PWMEnabled) {
@@ -201,7 +200,7 @@ static void analogWritePWM(uint32_t ulPin, uint32_t ulValue)
 		SetPeripheral(port, g_aPinMap[ulPin].ulAnalogOutPinType, g_aPinMap[ulPin].ulPin);
 		port->PIO_IDR = 1 << g_aPinMap[ulPin].ulPin;						// disable interrupt
 		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = 0;
-		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA;		// configure the PWM channel clock
+		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CMR = PWM_CMR_CPRE_CLKA | PWM_CMR_CPOL;		// configure the PWM channel clock & set polarity
 		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD = PWM_MAX_DUTY_CYCLE;		// set the PWM period
 		// assert(ulValue <= PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CPRD);		// check the duty cycle is in bounds
 		PWM_INTERFACE->PWM_CH_NUM[chan].PWM_CDTY = ulValue;					// set duty cycle
@@ -391,6 +390,7 @@ static uint16_t FindClockConfiguration(
     // assert(frequency < mck);
 
     /* Find prescaler and divisor values */
+	if (frequency > mck) return 1;	// If we're asking for an unusable frequency, return the highest available
     prescaler = (mck / divisors[divisor]) / frequency;
     while ((prescaler > 255) && (divisor < 11)) {
 
@@ -407,7 +407,7 @@ static uint16_t FindClockConfiguration(
     }
     else
     {
-        return 0 ;
+        return 1 ;
     }
 }
 
